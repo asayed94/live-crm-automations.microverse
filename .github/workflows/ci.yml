@@ -1,0 +1,98 @@
+name: Monorepo CI Workflow
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Get base ref to compare against
+        id: get_base_ref
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const ctx = {
+              base_ref: '${{ github.base_ref }}',
+              event_name: '${{ github.event_name }}',
+              ref_name: '${{ github.ref_name }}',
+              workflow_id: 'ci.yml'
+            }
+            return require('./packages/build-tools/scripts/get-base-ref.js')({ core, github }, ctx, context)
+
+      - name: 'PR build: fetch history down until the merge-base'
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: ./.github/actions/fetch-through-merge-base
+
+      - name: 'Push build: fetch history from the last successful workflow run for base ref comparison'
+        if: ${{ github.event_name != 'pull_request' && steps.get_base_ref.outputs.base_ref_timestamp != '' }}
+        run: |
+          git fetch --no-tags --prune --shallow-since="${{ steps.get_base_ref.outputs.base_ref_timestamp }}" origin +refs/heads/${{ github.ref_name }}:refs/remotes/origin/${{ github.ref_name }}
+
+      - name: Read .npm-version
+        run: echo ::set-output name=NPM_VERSION::$(cat .npm-version)
+        id: npm_version
+
+      - name: Setup NodeJS
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: '.node-version'
+
+      - name: Install npm
+        run: |
+          npm install -g npm@${{ steps.npm_version.outputs.NPM_VERSION }}
+
+      - name: Configure npm cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Configure Turbo cache
+        uses: actions/cache@v2
+        with:
+          path: .turbo-cache
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build & Unit tests
+        run: npx turbo run lint format:check typecheck test:unit build --since=${{ steps.get_base_ref.outputs.base_ref }} --cache-dir=./.turbo-cache
+
+      - name: Collect slice artefacts
+        id: collect_artefacts
+        uses: actions/github-script@v6
+        with:
+          script: |
+            return require('./packages/build-tools/scripts/collect-slice-artefacts.js')({ glob })
+
+      - name: Setup local DynamoDB
+        if: contains(toJSON(steps.collect_artefacts.outputs.result), '.lambda')
+        uses: rrainn/dynamodb-action@v2.0.0
+        with:
+          sharedDb: true
+          port: 8000
+          cors: '*'
+
+      - name: Integration tests (lambda)
+        if: contains(toJSON(steps.collect_artefacts.outputs.result), '.lambda')
+        run: npx turbo run test:integration --since=${{ steps.get_base_ref.outputs.base_ref }} --cache-dir=./.turbo-cache
+        env:
+          AWS_ACCESS_KEY_ID: local
+          AWS_SECRET_ACCESS_KEY: local

@@ -1,0 +1,102 @@
+{
+  "root": true,
+  // "ignorePatterns": [
+  //   "**/*"
+  // ],
+  "parser": "@typescript-eslint/parser",
+  "plugins": [
+    "prettier",
+    "sort-exports",
+    "@typescript-eslint",
+    "@nrwl/nx"
+  ],
+  "settings": {
+    "import/parsers": {
+      "@typescript-eslint-parser": [
+        ".ts",
+        ".tsx"
+      ]
+    }
+  },
+  "extends": [
+    "prettier",
+    "eslint:recommended",
+    "eslint-config-airbnb-base",
+    "plugin:@typescript-eslint/eslint-recommended",
+    "plugin:@typescript-eslint/recommended"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "*.ts",
+        "*.tsx"
+      ],
+      "rules": {
+        // CUSTOM RULES
+        "no-shadow": "error",
+        "no-unexpected-multiline": "error",
+        "camelcase": "warn",
+        "arrow-spacing": "warn",
+        "max-len": [
+          "error",
+          120
+        ],
+        "no-empty-function": "warn",
+        "no-use-before-define": "error",
+        "no-useless-rename": "error",
+        "comma-dangle": [
+          "warn",
+          "always-multiline"
+        ],
+        "comma-style": [
+          "error",
+          "last"
+        ],
+        "no-unused-expressions": "off",
+        "no-return-await": "warn",
+        "no-unused-vars": "warn",
+        "quotes": [
+          "error",
+          "single",
+          {
+            "avoidEscape": true,
+            "allowTemplateLiterals": true
+          }
+        ],
+        "semi": [
+          "error",
+          "never"
+        ],
+        "semi-style": [
+          "error",
+          "first"
+        ],
+        "eqeqeq": [
+          "error",
+          "smart"
+        ],
+        "import/extensions": [
+          "error",
+          {
+            "*": "ignorePackages",
+            "js": "never",
+            "jsx": "never",
+            "ts": "never",
+            "tsx": "never"
+          }
+        ],
+        "import/prefer-default-export": "off",
+        "import/no-unresolved": "off"
+      }
+    },
+    {
+      "files":[
+        "*.js",
+        "*.jsx"
+      ],
+      "rules": {
+        "@typescript-eslint/no-var-requires": "off"
+      }
+    }
+  ]
+}

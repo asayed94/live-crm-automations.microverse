@@ -1,0 +1,62 @@
+service: crmSeminarJoinedKinesisLambda
+
+	
+# Configuration validation: 'error' (fatal error), 'warn' (logged to the output) or 'off' (default: warn)
+# See https://www.serverless.com/framework/docs/configuration-validation
+configValidationMode: error
+
+plugins:
+  - "serverless-bundle"
+  - serverless-offline
+
+package:
+  individually: true
+
+custom:
+  stage: ${opt:stage, 'dev'}
+  serverless-offline:
+    httpPort: 3333
+    lambdaPort: 2333
+    noPrependStageInUrl: true
+  serverless-offline-kinesis:
+    apiVersion: '2013-12-02'
+    endpoint: http://0.0.0.0:4567
+    region: eu-west-1
+    accessKeyId: root
+    secretAccessKey: root
+    skipCacheInvalidation: false
+    readInterval: 500
+  bundle:
+    linting: false
+    tsConfig: "tsconfig.app.json"
+
+params:
+  prod:
+    production: true
+  default:
+    production: false
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+  stage: ${self:custom.stage}
+  endpointType: regional
+  timeout: 20
+  environment:
+    APP_ENV: ${self:custom.stage}
+    IS_PRODUCTION: ${param:production}
+    NODE_OPTIONS: --enable-source-maps
+
+functions:
+  foo:
+    handler: src/index.default
+    events:
+      - stream:
+          enabled: true
+          type: kinesis
+          arn: arn:aws:kinesis:eu-west-1:XXXXXX:stream/polls
+          batchSize: 10
+          startingPosition: TRIM_HORIZON
+      - http:
+          method: GET
+          path: /foo
